@@ -1,0 +1,46 @@
+name: Sync upstream
+
+on:
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-upstream-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Merge Codeberg upstream
+    runs-on: ubuntu-latest
+
+    env:
+      UPSTREAM_URL: https://codeberg.org/akib/emacs-eat.git
+      UPSTREAM_BRANCH: master
+      TARGET_BRANCH: ${{ github.event.repository.default_branch }}
+
+    steps:
+      - name: Checkout target branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+
+      - name: Configure git author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream "$UPSTREAM_URL" 2>/dev/null || git remote set-url upstream "$UPSTREAM_URL"
+          git fetch upstream "$UPSTREAM_BRANCH:refs/remotes/upstream/$UPSTREAM_BRANCH"
+
+      - name: Merge upstream
+        run: git merge --no-edit upstream/"$UPSTREAM_BRANCH"
+
+      - name: Push merged branch
+        run: git push origin HEAD:"$TARGET_BRANCH"
